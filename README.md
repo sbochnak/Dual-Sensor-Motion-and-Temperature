@@ -12,3 +12,15 @@
     - user interface specification (YAML files)
   - Real-life use case:
     - as described in the comments withing the files.
+
+Use case:
+ - self-designed and produced intelligent sensor that detects motion, measures temperature and humidity
+ - precise motion detection (class-better than offered by PIR sensors)
+ - automated lights on, delayed lights off
+ - specific case for detecting motion / lack of montion and switching on/off lights in a space, where no hands might be available to operate light switches
+
+Learning opportunities:
+- physics (microwaves!)
+- electronics
+- low-level / low-code programming
+- Home Assistant configuration and scripting
