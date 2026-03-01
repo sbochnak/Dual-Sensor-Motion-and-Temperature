@@ -1,0 +1,214 @@
+#
+# This file presents excerpts from the original Home Assistant automation file, which contains all the scripts.
+# Here you acn find all that is relevant to using a Double Sensor (as defined in YAML) to control objects, like lights.
+#
+
+# Desired behaviour in a given location:
+# My location is a windowless (dark) garage, that serves as a storage room.
+# It implies that whenever someone enters he/she might carry something, so no free hand to switch on/off the lights.
+# Standard PIR does not work well, because if you stay a bit longer and do not move widely enough for PIR to notice,
+# the light goes off in the least appropriate moment.
+# Also, as summers are getting hotter, PIR stops to register the moves as the temperature difference becomes to small for it to notice.
+# Therefore I decided for an active (radar) movement detector.
+# It has the benfit of being much more sensitive than PIR, even small moves (hand) are detected and can be used to build the automation.
+# And, obviously, it is insensitive to temperature and even some thin objects in between sensor and you (radiowave will go through, infrared wave - not).
+
+
+######################################
+#
+#   OVERVIEW (Sequence "diagram")
+#
+######################################
+
+# How this device and HA work together?
+#   1. A motion sensor detects quite small movement and sends an event. (Then "sleeps for 2 seconds". This is hardware property of the RCWL-0516 board!)
+#   2. The event triggers:
+#   3. Script "Garage - turn on the lights".
+#      - in the body of the scripts all the switches, lampes etc. are turned on (here: 2).
+#      - the last action initiates countdown before lights go off (triggers automation script)
+#   4. the script 'Garage start countdown to lights off'. 
+#      This script activates the timer OR if resets it to start countdown every time a motion is detected. 
+#      This is meant to avoid light switched off when someone stands e.g. in front of a wardrobe thinking what to take.
+#   5. When the timer counts to 0, if fires an event, which triggers
+#      Script "Garage - time passed, turning off lights"
+#   6. When there is no motion detected for 60sec, 
+#      Script "Garage - no motion detected" is called, which in turn calls Script 4.
+#      So actually this is the longest sequence the lights will be on (60 secs + 3:30 as per consts in the scripts here).
+#
+# To get it working you need to:
+# 1. create timer entity (here - timer.garage_lights_timer)
+# 2. create automations -  either to edit your YAML carefully OR
+#     manually create each automation individually, using appropriate IDs of entities.
+#
+
+#############################
+#
+#  INDIVIDUAL SCRIPTS
+#
+#############################
+
+#
+# Step 1 and Step 2 happen in the electronics and in the ESPHome software. 
+# See "czujnik-ruchu-i-temperatury.YAML" file for the definition.
+#
+
+#
+# Step 3:
+# Garage - turn on the lights
+#
+alias: Garaz-wlacz-swiatla-sufitowe
+description: ""
+triggers:
+  # if motion is reported by the doppler sensor...
+  #  (note: I add here 2secs for safety / performance. The board itself (see YAML) should not detect movements more often than that.
+  #  So, we can let HA know not to waste resources on active waiting. Also, if there are triggers more often than that, this means
+  # the board had been built wrongly - wrong components, soldering or - like in my case - missing capacitor of 220uF at the Doppler sensor).
+  - entity_id:
+      - binary_sensor.czujnik_ruchu_i_temperatury_ruch_dopplera
+    to: "on"
+    enabled: true
+    trigger: state
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 2
+conditions: []
+actions:
+# turn on smart power outlet (light 1)
+  - type: turn_on
+    device_id: a8de73a90715b91f88f0448e578ae633
+    entity_id: 0c036eb7d76e35a0563762571a0eb99e
+    domain: switch
+# turn on shelly switch (lights 2)    
+  - type: turn_on
+    device_id: 7f7f0013ef72e3d08e12af237e54fe4f
+    entity_id: b2298943b20937d8a1ff6dc4c6b34467
+    domain: switch
+# (re)start countdown to lights off    
+  - target:
+      entity_id: automation.garaz_rozpocznij_odliczanie_do_zgaszenia
+    data:
+      skip_condition: true
+    action: automation.trigger
+mode: restart
+
+
+#
+# Step 4:
+# Garage start countdown to lights off
+# Each call restarts countdown.
+# Timer behaves differently depending if it is active or not, so this is handled with if clause.
+#
+alias: Garaz rozpocznij odliczanie do zgaszenia
+description: Odlicza 3:30 do zgaszenia świateł.
+mode: restart
+triggers: []
+conditions: []
+actions:
+  # log entry is generated, to be seen in user logs for diagnostic purposes
+  - data:
+      message: >-
+        Uruchamiam opóźnione wyłączenie świateł w garażu (na 3:30) z powodu
+        bezruchu
+      entity_id: binary_sensor.czujnik_ruchu_i_temperatury_ruch_dopplera
+      domain: motion
+      name: Uruchamiam / resetuje zegar
+    action: logbook.log
+  # timer starting or re-starting needs to be handled slightly differently
+  - if:
+      - condition: state
+        entity_id: timer.garage_lights_timer
+        state: active
+    then:
+      - target:
+          entity_id:
+            - timer.garage_lights_timer
+          device_id: []
+          area_id: []
+        data: {}
+        action: timer.start
+    else:
+      - target:
+          entity_id: timer.garage_lights_timer
+        data:
+        # Change here if you want shorter/longer time with lights on without movement
+          duration: "0:3:30"
+        action: timer.start
+
+
+#
+# Step 5:
+# Garage - time passed, turning off lights
+# This does reverse of what the "Garage - turn on the lights" script did, so turns off all the objects, 
+# and sends message to the log.
+#
+alias: Garaz-czas-minal-gasze-swiatlo
+description: ""
+triggers:
+  - event_type: timer.finished
+    event_data:
+      entity_id: timer.garage_lights_timer
+    trigger: event
+conditions: []
+actions:
+  # log "Time is off, switching lights off"
+  - data:
+      message: "Garaż: czas minął, gaszę światła!"
+      entity_id: timer.garage_lights_timer
+      name: Światła w garażu
+    action: logbook.log
+  # turn off appropriate objects
+  - type: turn_off
+    device_id: a8de73a90715b91f88f0448e578ae633
+    entity_id: 0c036eb7d76e35a0563762571a0eb99e
+    domain: switch
+  - type: turn_off
+    device_id: 7f7f0013ef72e3d08e12af237e54fe4f
+    entity_id: b2298943b20937d8a1ff6dc4c6b34467
+    domain: switch
+mode: restart
+
+
+
+#
+# Step 6:
+# Garage - detected no movements
+# This script triggers after the person has left the room for "sure" (meainng: no movements detected for 60 seconds)
+# This resets the countdown AND logs that the reason to switch off the lights was lack of movement.
+# This script serves several purposes:
+#   1. In case of a sensor malfunction OR something blocking the visibility of the sensor, it leaves a message in the log.
+#   2. If everything works fine with detecting movements (without false positives and false negatives), the time to still keep the lights on may be shortned.
+#
+alias: Garaz-wykryty-brak-ruchu
+description: ""
+triggers:
+  # When Doppler motion reports nothing for 60 secs...
+  - entity_id:
+      - binary_sensor.czujnik_ruchu_i_temperatury_ruch_dopplera
+    to: "off"
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 60
+    enabled: true
+    trigger: state
+conditions: []
+actions:
+  # Leave entry in the log, explaining to your angry wife why lights went off
+  - data:
+      name: Światło w garażu
+      message: >-
+        Brak ruchu przez 60 sekund. Uruchamiam opóźnione wyłączenie świateł w
+        garażu (na 3:30) z powodu bezruchu
+      entity_id: binary_sensor.czujnik_ruchu_i_temperatury_ruch_dopplera
+      domain: motion
+    action: logbook.log
+  
+  # Trigger Script Step 4 - start countdown to lights off
+  - target:
+      entity_id: automation.garaz_rozpocznij_odliczanie_do_zgaszenia 
+    data:
+      skip_condition: true
+    action: automation.trigger
+mode: restart
+

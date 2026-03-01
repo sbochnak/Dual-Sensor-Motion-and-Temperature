@@ -4,9 +4,18 @@
 
 # target location: garaż
 # status: fully functional, deployed on site
-# Note: some input line filtering is obligatory (see links at the sensor section): 220 uF capacitor!
 
- 
+# Important lesson learned: some input line filtering is obligatory (see links at the sensor section): 220 uF capacitor!
+
+# Please note that references in this file to "lights" have nothing to do with the "big" lights or bulbs.
+# ESP32 board only generates events that are received by Home Assistant and processed further (ie. triggers other actions).
+# Lights in this file refer to the LEDs available on the M5 stack controller, and are used for diagnostic purposes informing:  
+#  - power on - fast blue pulsing
+#  - WiFi connected - green slow pulsing
+#  - WiFi disconneted - red fast pulsing
+#  - motion detected - one red pulse
+
+
 esphome:
   name: czujnik-ruchu-i-temperatury
   friendly_name: Czujnik ruchu i temperatury
@@ -49,11 +58,11 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "LxchxPde6kzyYm9Y1TGVpxrKNQvcDPC08pmvWuUUeug="
+    key: "LxchxPde6kzYzm9Y1TGVpxrKNQvcPDC08pmvWuUUeug="
 
 ota:
   - platform: esphome
-    password: "9880243118fd59abaff3a64cad825028"
+    password: "8980243118fd59abaff3a64cad825028"
 
 
 wifi:

@@ -1,0 +1,50 @@
+
+  # Note: this is an excerpt of the bigger set of YAML files configuring dashboards
+  # This part shows sammple use of the Dual Motion and Temperature Sensor.
+  # See the "Screenshot from HomeAssistant" to have a clue what it looked like:
+  #   1. Two independent lights are turned on when motion is detected (two cards in the UI)
+  #   2. A button representing countdown timer to turning off the light (relevant if this is in a dark space, like a garage or a cellar)
+  #   3. chip cards to present temperature and humidity
+  - title: In a garage
+    type: grid
+    cards:
+      - type: custom:mushroom-chips-card
+        chips:
+          - type: entity
+            entity: sensor.czujnik_ruchu_i_temperatury_temperatura
+          - type: entity
+            entity: sensor.czujnik_ruchu_i_temperatury_wilgotno
+          - type: entity
+            entity: binary_sensor.czujnik_ruchu_i_temperatury_ruch_dopplera
+          - type: entity
+            entity: timer.garage_lights_timer
+            name: Czas
+            use_entity_picture: true
+      - type: custom:layout-card
+        layout_type: custom:grid-layout
+        layout:
+          grid-template-columns: 1fr 1fr
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.gniazdo_w_garazu
+            name: Przy wejściu
+            layout: vertical
+            icon: mdi:light-flood-up
+            tap_action:
+              action: toggle
+          - show_name: true
+            show_icon: true
+            type: custom:mushroom-entity-card
+            layout: vertical
+            tap_action:
+              action: toggle
+            entity: switch.lampa_w_garderobie
+            name: W garderobie
+            icon: mdi:light-flood-down
+            show_state: true
+
+      - type: entities
+        entities:
+          - entity: timer.garage_lights_timer
+            name: Czas do zgaszenia
+
